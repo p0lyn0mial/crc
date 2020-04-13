@@ -10,11 +10,12 @@ import (
 )
 
 const (
-	dnsServicePort              = 53
-	dnsConfigFilePathInInstance = "/var/srv/dnsmasq.conf"
-	dnsContainerIP              = "10.88.0.8"
-	dnsContainerImage           = "quay.io/crcont/dnsmasq:latest"
-	publicDNSQueryURI           = "quay.io"
+	dnsServicePort                  = 53
+	dnsConfigFilePathInInstance     = "/var/srv/dnsmasq.conf"
+	dnsHostConfigFilePathInInstance = "/var/srv/hosts.openshift"
+	dnsContainerIP                  = "10.88.0.8"
+	dnsContainerImage               = "quay.io/crcont/dnsmasq:latest"
+	publicDNSQueryURI               = "quay.io"
 )
 
 func init() {
@@ -46,8 +47,8 @@ func RunPostStart(serviceConfig services.ServicePostStartConfig) (services.Servi
 	_, _ = serviceConfig.SSHRunner.Run(fmt.Sprintf("sudo rm -f /var/lib/cni/networks/podman/%s", dnsContainerIP))
 
 	// Start the dnsmasq container
-	dnsServerRunCmd := fmt.Sprintf("sudo podman run  --ip %s --name dnsmasq -v %s:/etc/dnsmasq.conf -p 53:%d/udp --privileged -d %s",
-		dnsContainerIP, dnsConfigFilePathInInstance, dnsServicePort, dnsContainerImage)
+	dnsServerRunCmd := fmt.Sprintf("sudo podman run  --ip %s --name dnsmasq -v %s:/etc/dnsmasq.conf -v %s:/etc/hosts.openshift -p 53:%d/udp --privileged -d %s",
+		dnsContainerIP, dnsConfigFilePathInInstance, dnsHostConfigFilePathInInstance, dnsServicePort, dnsContainerImage)
 	_, err = serviceConfig.SSHRunner.Run(dnsServerRunCmd)
 	if err != nil {
 		result.Success = false

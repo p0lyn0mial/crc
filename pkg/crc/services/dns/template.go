@@ -22,7 +22,10 @@ address=/{{ .AppsDomain }}/{{ .IP }}
 address=/etcd-0.{{ .ClusterName}}.{{ .BaseDomain }}/{{ .IP }}
 address=/api.{{ .ClusterName}}.{{ .BaseDomain }}/{{ .IP }}
 address=/api-int.{{ .ClusterName}}.{{ .BaseDomain }}/{{ .IP }}
-address=/{{ .Hostname }}.{{ .ClusterName}}.{{ .BaseDomain }}/{{ .IP }}
+addn-hosts=/etc/hosts.openshift
+`
+	dnsmasqHostsTemplate = `{{.InternalIP}} {{ .Hostname }}.{{ .ClusterName}}.{{ .BaseDomain }}
+{{ .IP }} {{ .Hostname }}.{{ .ClusterName}}.{{ .BaseDomain }}
 `
 )
 
@@ -33,6 +36,7 @@ type dnsmasqConfFileValues struct {
 	Hostname    string
 	IP          string
 	AppsDomain  string
+	InternalIP  string
 }
 
 func createDnsmasqDNSConfig(serviceConfig services.ServicePostStartConfig) error {
@@ -45,9 +49,10 @@ func createDnsmasqDNSConfig(serviceConfig services.ServicePostStartConfig) error
 		AppsDomain:  serviceConfig.BundleMetadata.ClusterInfo.AppsDomain,
 		ClusterName: serviceConfig.BundleMetadata.ClusterInfo.ClusterName,
 		IP:          serviceConfig.IP,
+		InternalIP:  serviceConfig.BundleMetadata.Nodes[0].InternalIP,
 	}
 
-	dnsConfig, err := createDnsConfigFile(dnsmasqConfFileValues)
+	dnsConfig, err := createDnsConfigFile(dnsmasqConfFileValues, dnsmasqConfTemplate)
 	if err != nil {
 		return err
 	}
@@ -59,13 +64,27 @@ func createDnsmasqDNSConfig(serviceConfig services.ServicePostStartConfig) error
 	if err != nil {
 		return err
 	}
+
+	dnsHostConfig, err := createDnsConfigFile(dnsmasqConfFileValues, dnsmasqHostsTemplate)
+	if err != nil {
+		return err
+	}
+
+	encodeddnsConfig = base64.StdEncoding.EncodeToString([]byte(dnsHostConfig))
+	_, err = serviceConfig.SSHRunner.Run(
+		fmt.Sprintf("echo '%s' | openssl enc -base64 -d | sudo tee /var/srv/hosts.openshift > /dev/null",
+			encodeddnsConfig))
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
-func createDnsConfigFile(values dnsmasqConfFileValues) (string, error) {
+func createDnsConfigFile(values dnsmasqConfFileValues, tmpl string) (string, error) {
 	var dnsConfigFile bytes.Buffer
 
-	t, err := template.New("dnsConfigFile").Parse(dnsmasqConfTemplate)
+	t, err := template.New("dnsConfigFile").Parse(tmpl)
 	if err != nil {
 		return "", err
 	}
