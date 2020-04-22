@@ -392,17 +392,6 @@ func Start(startConfig StartConfig) (StartResult, error) {
 		// A restart of the openshift-apiserver pod is enough to clear that error and get a working cluster.
 		// This is a work-around while the root cause is being identified.
 		// More info: https://bugzilla.redhat.com/show_bug.cgi?id=1795163
-		logging.Debug("Waiting for update of client-ca request header ...")
-		if err := cluster.WaitforRequestHeaderClientCaFile(ocConfig); err != nil {
-			result.Error = err.Error()
-			return *result, errors.New(err.Error())
-		}
-
-		if err := cluster.DeleteOpenshiftApiServerPods(ocConfig); err != nil {
-			result.Error = err.Error()
-			return *result, errors.New(err.Error())
-		}
-
 		logging.Infof("Starting OpenShift cluster ... [waiting 3m]")
 	}
 	result.KubeletStarted = kubeletStarted
